@@ -48,7 +48,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           sonar-scanner \
-            -Dsonar.organization=Nizar-Rasyiid \
+            -Dsonar.organization=nizar-rasyiid \
             -Dsonar.projectKey=Nizar-Rasyiid_Enchanced-Security-Performance \
             -Dsonar.sources=. \
             -Dsonar.go.coverage.reportPaths=coverage.out \
