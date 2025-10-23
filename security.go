@@ -5,7 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 )
@@ -183,14 +185,59 @@ func RequestLoggingMiddleware(next http.Handler) http.Handler {
 // Middleware: Enforce HTTPS (CONFIDENTIALITY)
 // ============================================================================
 
+// isValidRedirectURL validates that redirect URL is safe (prevent open redirect)
+func isValidRedirectURL(redirectURL string) bool {
+	if redirectURL == "" {
+		return false
+	}
+
+	// Parse the URL
+	u, err := url.Parse(redirectURL)
+	if err != nil {
+		return false
+	}
+
+	// Only allow absolute URLs with https scheme
+	if u.Scheme != "https" {
+		return false
+	}
+
+	// Validate host is in allowed list (whitelist validation)
+	// For local dev, allow localhost; for prod, use environment config
+	allowedHosts := map[string]bool{
+		"localhost:8443": true,
+		"127.0.0.1:8443": true,
+		"[::1]:8443":     true,
+	}
+
+	if !allowedHosts[u.Host] {
+		log.Printf("[SECURITY] Attempted open redirect to: %s", u.Host)
+		return false
+	}
+
+	return true
+}
+
 // HTTPSRedirectMiddleware redirects HTTP to HTTPS
 func HTTPSRedirectMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if securityConfig.RequireHTTPS && r.Header.Get("X-Forwarded-Proto") != "https" && r.URL.Scheme != "https" {
-			u := r.URL
-			u.Scheme = "https"
-			http.Redirect(w, r, u.String(), http.StatusMovedPermanently)
-			return
+			// Build HTTPS URL safely - only use path from request, no user input
+			u := &url.URL{
+				Scheme:   "https",
+				Host:     r.Host,
+				Path:     r.URL.Path,
+				RawQuery: r.URL.RawQuery,
+			}
+
+			// Validate the host to prevent open redirects
+			if net.ParseIP(r.Host) != nil || r.Host == "localhost" || r.Host == "localhost:8443" {
+				http.Redirect(w, r, u.String(), http.StatusMovedPermanently)
+				return
+			}
+
+			// For other hosts, log but don't redirect (security precaution)
+			log.Printf("[SECURITY] Rejected potential open redirect attempt to host: %s", r.Host)
 		}
 		next.ServeHTTP(w, r)
 	})

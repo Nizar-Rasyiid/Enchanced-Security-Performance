@@ -98,7 +98,7 @@ func createHealthRecordHandler(w http.ResponseWriter, r *http.Request) {
 	statsKey := fmt.Sprintf("health:%s:stats:%s", userID, req.Type)
 	rdb.Del(r.Context(), statsKey)
 
-	log.Printf("[AUDIT] Health record created: %s for user %s (type: %s)", record.ID, userID, req.Type)
+	log.Printf("[AUDIT] Health record created: %s for user: %s", record.ID, userID)
 
 	// Return created record
 	w.Header().Set("Content-Type", "application/json")

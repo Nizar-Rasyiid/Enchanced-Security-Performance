@@ -1,0 +1,50 @@
+# Build artifacts
+bin/
+dist/
+*.exe
+*.o
+*.a
+*.so
+
+# Dependencies
+vendor/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Certificates (SECURITY: Never commit private keys)
+certs/server.key
+certs/*.key
+*.key
+!*.pub
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Redis (local dev)
+dump.rdb
+
+# Test coverage
+*.cover
+coverage.txt

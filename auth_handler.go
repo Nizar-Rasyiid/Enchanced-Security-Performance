@@ -84,7 +84,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 	userJSON, _ := json.Marshal(user)
 	ttl := 24 * time.Hour
 	if err := rdb.Set(r.Context(), userKey, userJSON, ttl).Err(); err != nil {
-		log.Printf("[AUTH] Failed to store user: %v", err)
+		log.Printf("[AUTH] Failed to store user in cache")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{
 			"error": "Failed to register user",
@@ -92,8 +92,8 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Log registration attempt (INTEGRITY: audit trail)
-	log.Printf("[AUDIT] User registered: %s (%s)", user.Email, user.ID)
+	// Log registration attempt (INTEGRITY: audit trail) - use user ID only, not email
+	log.Printf("[AUDIT] User registered: %s", user.ID)
 
 	// Generate JWT token
 	token, err := generateJWT(user.ID)
@@ -159,7 +159,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	userJSON, err := rdb.Get(r.Context(), userKey).Result()
 	if err != nil {
 		// User not found or Redis error
-		log.Printf("[AUTH] Login failed for %s: user not found", req.Email)
+		log.Printf("[AUTH] Login attempt failed: user not found")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]string{
 			"error": "Invalid email or password",
@@ -178,7 +178,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Verify password (CONFIDENTIALITY: constant-time comparison)
 	if !VerifyPassword(user.Password, req.Password) {
-		log.Printf("[AUDIT] Failed login attempt for %s", req.Email)
+		log.Printf("[AUDIT] Failed login attempt (invalid credentials)")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]string{
 			"error": "Invalid email or password",
@@ -188,7 +188,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Check if user is active (INTEGRITY)
 	if !user.Active {
-		log.Printf("[AUDIT] Login attempt by inactive user: %s", user.Email)
+		log.Printf("[AUDIT] Login attempt by inactive user")
 		w.WriteHeader(http.StatusForbidden)
 		json.NewEncoder(w).Encode(map[string]string{
 			"error": "User account is inactive",
@@ -206,8 +206,8 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Log successful login (INTEGRITY: audit trail)
-	log.Printf("[AUDIT] User logged in: %s (%s)", user.Email, user.ID)
+	// Log successful login (INTEGRITY: audit trail) - use user ID only, not email
+	log.Printf("[AUDIT] User logged in: %s", user.ID)
 
 	// Return success response
 	w.Header().Set("Content-Type", "application/json")
