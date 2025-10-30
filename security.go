@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"log"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -222,23 +221,31 @@ func isValidRedirectURL(redirectURL string) bool {
 func HTTPSRedirectMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if securityConfig.RequireHTTPS && r.Header.Get("X-Forwarded-Proto") != "https" && r.URL.Scheme != "https" {
-			// Build HTTPS URL safely - only use path from request, no user input
-			u := &url.URL{
-				Scheme:   "https",
-				Host:     r.Host,
-				Path:     r.URL.Path,
-				RawQuery: r.URL.RawQuery,
+			// Only allow redirect for strict internal hosts (never user-controlled)
+			allowedHosts := map[string]bool{
+				"localhost":      true,
+				"localhost:8443": true,
+				"127.0.0.1":      true,
+				"127.0.0.1:8443": true,
+				"[::1]":          true,
+				"[::1]:8443":     true,
 			}
-
-			// Validate the host to prevent open redirects
-			if net.ParseIP(r.Host) != nil || r.Host == "localhost" || r.Host == "localhost:8443" {
+			if allowedHosts[r.Host] {
+				// Use a hardcoded safe host for redirect, never user-controlled
+				safeHost := "localhost:8443"
+				u := &url.URL{
+					Scheme:   "https",
+					Host:     safeHost,
+					Path:     r.URL.Path,
+					RawQuery: r.URL.RawQuery,
+				}
 				http.Redirect(w, r, u.String(), http.StatusMovedPermanently)
 				return
 			}
-
-			// For other hosts, log but don't redirect (security precaution)
-			log.Printf("[SECURITY] Rejected potential open redirect attempt to host: %s", r.Host)
+			// For other hosts, log and serve without redirect
+			log.Printf("[SECURITY] Rejected redirect: host not in whitelist: %s", r.Host)
 		}
+		// Always serve request if not redirected
 		next.ServeHTTP(w, r)
 	})
 }
