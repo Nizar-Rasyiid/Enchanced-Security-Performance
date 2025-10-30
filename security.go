@@ -231,8 +231,8 @@ func HTTPSRedirectMiddleware(next http.Handler) http.Handler {
 				"[::1]:8443":     true,
 			}
 			if allowedHosts[r.Host] {
-				// Use a hardcoded safe host for redirect, never user-controlled
-				safeHost := "localhost:8443"
+				// Use REDIRECT_HOST from environment, fallback to localhost:8443
+				safeHost := getEnvOrDefault("REDIRECT_HOST", "localhost:8443")
 				u := &url.URL{
 					Scheme:   "https",
 					Host:     safeHost,
