@@ -1,5 +1,6 @@
 package main
 
+// Global constant for default redirect host
 import (
 	"crypto/rand"
 	"encoding/base64"
@@ -10,6 +11,8 @@ import (
 	"os"
 	"time"
 )
+
+const DefaultRedirectHost = "localhost:8443"
 
 // ============================================================================
 // CIA Triad Security Framework
@@ -204,9 +207,9 @@ func isValidRedirectURL(redirectURL string) bool {
 	// Validate host is in allowed list (whitelist validation)
 	// For local dev, allow localhost; for prod, use environment config
 	allowedHosts := map[string]bool{
-		"localhost:8443": true,
-		"127.0.0.1:8443": true,
-		"[::1]:8443":     true,
+		DefaultRedirectHost: true,
+		"127.0.0.1:8443":    true,
+		"[::1]:8443":        true,
 	}
 
 	if !allowedHosts[u.Host] {
@@ -223,16 +226,16 @@ func HTTPSRedirectMiddleware(next http.Handler) http.Handler {
 		if securityConfig.RequireHTTPS && r.Header.Get("X-Forwarded-Proto") != "https" && r.URL.Scheme != "https" {
 			// Only allow redirect for strict internal hosts (never user-controlled)
 			allowedHosts := map[string]bool{
-				"localhost":      true,
-				"localhost:8443": true,
-				"127.0.0.1":      true,
-				"127.0.0.1:8443": true,
-				"[::1]":          true,
-				"[::1]:8443":     true,
+				"localhost":         true,
+				DefaultRedirectHost: true,
+				"127.0.0.1":         true,
+				"127.0.0.1:8443":    true,
+				"[::1]":             true,
+				"[::1]:8443":        true,
 			}
 			if allowedHosts[r.Host] {
 				// Use REDIRECT_HOST from environment, fallback to localhost:8443
-				safeHost := getEnvOrDefault("REDIRECT_HOST", "localhost:8443")
+				safeHost := getEnvOrDefault("REDIRECT_HOST", DefaultRedirectHost)
 				u := &url.URL{
 					Scheme:   "https",
 					Host:     safeHost,
